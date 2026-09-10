@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { BookOpen, ChevronLeft, LogOut, Menu, Plus, RefreshCw, Search } from 'lucide-react'
+import { BookOpen, ChevronLeft, LogOut, Menu, Moon, Plus, RefreshCw, Search, Sun } from 'lucide-react'
 import { BookEditor } from './BookEditor'
 import { Chapter, createChapter, createGithub, discoverProjects, loadChapters, loadProject, Project, saveChapter } from './github'
 import { storage } from './storage'
@@ -15,6 +15,7 @@ function nextChapterName(chapters: Chapter[]) {
 }
 
 export default function App() {
+  const [theme, setTheme] = useState(storage.getTheme())
   const [token, setToken] = useState(storage.getToken())
   const [tokenDraft, setTokenDraft] = useState(token)
   const octokit = useMemo(() => token ? createGithub(token) : null, [token])
@@ -29,6 +30,16 @@ export default function App() {
   const [drawer, setDrawer] = useState(false)
   const [manualRepo, setManualRepo] = useState('')
   const touchStart = useRef<{ x: number; y: number } | null>(null)
+
+  useEffect(() => {
+    document.documentElement.dataset.theme = theme
+    document.documentElement.style.colorScheme = theme
+    storage.setTheme(theme)
+  }, [theme])
+
+  const toggleTheme = () => setTheme((current) => current === 'light' ? 'dark' : 'light')
+  const themeIcon = theme === 'light' ? <Moon size={18} /> : <Sun size={18} />
+  const themeTitle = theme === 'light' ? 'Тёмная тема' : 'Светлая тема'
 
   const activeChapter = chapters.find((chapter) => chapter.path === activePath) || null
 
@@ -188,6 +199,7 @@ export default function App() {
   if (!token) {
     return (
       <main className="auth-page">
+        <button className="icon-button theme-floating" onClick={toggleTheme} title={themeTitle} aria-label={themeTitle}>{themeIcon}</button>
         <section className="auth-card">
           <div className="brand-mark"><BookOpen /></div>
           <h1>happy-writer</h1>
@@ -204,7 +216,7 @@ export default function App() {
   if (!project) {
     return (
       <main className="projects-page">
-        <header className="projects-header"><div><h1>happy-writer</h1><span>Книги</span></div><button className="icon-button" onClick={logout} title="Выйти"><LogOut size={18} /></button></header>
+        <header className="projects-header"><div><h1>happy-writer</h1><span>Книги</span></div><div className="header-actions"><button className="icon-button" onClick={toggleTheme} title={themeTitle} aria-label={themeTitle}>{themeIcon}</button><button className="icon-button" onClick={logout} title="Выйти"><LogOut size={18} /></button></div></header>
         <section className="project-actions">
           <div className="repo-input"><Search size={18} /><input value={manualRepo} onChange={(e) => setManualRepo(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && void openManualProject()} placeholder="owner/repository" /><button onClick={() => void openManualProject()}>Открыть</button></div>
           <button className="secondary" onClick={() => void refreshProjects()} disabled={busy}><RefreshCw size={17} className={busy ? 'spin' : ''} /> Найти book-framework репозитории</button>
@@ -223,7 +235,7 @@ export default function App() {
       {drawer && <button className="drawer-scrim" onClick={() => setDrawer(false)} aria-label="Закрыть меню" />}
       <aside className={`sidebar ${drawer ? 'open' : ''}`}>
         <div className="sidebar-head">
-          <button className="back-button" onClick={() => { setProject(null); setDrawer(false) }}><ChevronLeft size={18} /> К книгам</button>
+          <div className="sidebar-actions"><button className="back-button" onClick={() => { setProject(null); setDrawer(false) }}><ChevronLeft size={18} /> К книгам</button><button className="sidebar-theme" onClick={toggleTheme} title={themeTitle} aria-label={themeTitle}>{themeIcon}</button></div>
           <h2>{project.title}</h2>
           <span>{project.fullName}</span>
         </div>
@@ -237,6 +249,7 @@ export default function App() {
         <header className="mobile-header">
           <button className="icon-button" onClick={() => setDrawer(true)}><Menu /></button>
           <div><strong>{activeChapter?.title || project.title}</strong><span>{project.title}</span></div>
+          <button className="icon-button mobile-theme" onClick={toggleTheme} title={themeTitle} aria-label={themeTitle}>{themeIcon}</button>
         </header>
         {error && <div className="error-box editor-error">{error}</div>}
         {activeChapter ? <BookEditor value={content} onChange={edit} /> : <div className="empty editor-empty">В книге пока нет глав. Создай первую через меню.</div>}
