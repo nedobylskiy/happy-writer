@@ -11,7 +11,6 @@ function inlineToHtml(text: string) {
   html = html.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
   html = html.replace(/(^|[^*])\*([^*]+)\*/g, '$1<em>$2</em>')
   html = html.replace(/\[([^\]]+)\]\((https?:\/\/[^)]+)\)/g, '<a href="$2">$1</a>')
-  html = html.replace(/\[\^([^\]]+)\]/g, '<span class="footnote-ref" data-footnote-ref="$1" contenteditable="false">[$1]</span>')
   return html
 }
 
@@ -44,10 +43,7 @@ function sourceToHtml(source: string) {
       }
       continue
     }
-    if (inCode) {
-      code.push(line)
-      continue
-    }
+    if (inCode) { code.push(line); continue }
     if (line === '---') {
       flush()
       blocks.push('<div class="scene-break" data-scene-break="true" contenteditable="false"><span>• • •</span><small>разрыв сцены</small></div>')
@@ -66,10 +62,7 @@ function sourceToHtml(source: string) {
       blocks.push(`<h${level}>${inlineToHtml(heading[2])}</h${level}>`)
       continue
     }
-    if (!line.trim()) {
-      flush()
-      continue
-    }
+    if (!line.trim()) { flush(); continue }
     paragraph.push(line)
   }
   flush()
@@ -80,7 +73,6 @@ function sourceToHtml(source: string) {
 function inlineFromNode(node: Node): string {
   if (node.nodeType === Node.TEXT_NODE) return node.textContent || ''
   if (!(node instanceof HTMLElement)) return ''
-  if (node.dataset.footnoteRef) return `[^${node.dataset.footnoteRef}]`
   const inner = Array.from(node.childNodes).map(inlineFromNode).join('')
   const tag = node.tagName.toLowerCase()
   if (tag === 'strong' || tag === 'b') return `**${inner}**`
@@ -100,10 +92,7 @@ function htmlToSource(root: HTMLElement) {
       continue
     }
     if (!(node instanceof HTMLElement)) continue
-    if (node.dataset.sceneBreak === 'true') {
-      blocks.push('---')
-      continue
-    }
+    if (node.dataset.sceneBreak === 'true') { blocks.push('---'); continue }
     if (node.dataset.footnoteDef) {
       const id = node.dataset.footnoteDef
       const parts = Array.from(node.childNodes).slice(1).map(inlineFromNode).join('').trimStart()
@@ -137,6 +126,23 @@ export function BookEditor({ value, onChange }: { value: string; onChange: (valu
     lastValue.current = value
   }, [value])
 
+  useEffect(() => {
+    const viewport = window.visualViewport
+    if (!viewport) return
+    const update = () => {
+      const keyboard = Math.max(0, window.innerHeight - viewport.height - viewport.offsetTop)
+      document.documentElement.style.setProperty('--keyboard-offset', `${keyboard}px`)
+    }
+    update()
+    viewport.addEventListener('resize', update)
+    viewport.addEventListener('scroll', update)
+    return () => {
+      viewport.removeEventListener('resize', update)
+      viewport.removeEventListener('scroll', update)
+      document.documentElement.style.removeProperty('--keyboard-offset')
+    }
+  }, [])
+
   const emit = () => {
     if (!ref.current) return
     const source = htmlToSource(ref.current)
@@ -168,7 +174,7 @@ export function BookEditor({ value, onChange }: { value: string; onChange: (valu
     const text = window.prompt('Текст сноски', '')
     if (text === null) return
 
-    document.execCommand('insertHTML', false, `<span class="footnote-ref" data-footnote-ref="${escapeHtml(id)}" contenteditable="false">[${escapeHtml(id)}]</span>`)
+    document.execCommand('insertText', false, `[^${id}]`)
     const duplicate = ref.current.querySelector(`[data-footnote-def="${CSS.escape(id)}"]`)
     if (!duplicate) {
       ref.current.insertAdjacentHTML('beforeend', `<div class="footnote-def" data-footnote-def="${escapeHtml(id)}"><span contenteditable="false">[^${escapeHtml(id)}]:</span> ${inlineToHtml(text)}</div>`)
@@ -176,31 +182,20 @@ export function BookEditor({ value, onChange }: { value: string; onChange: (valu
     emit()
   }
 
-  const toolbar = (
-    <div className="toolbar" aria-label="Форматирование">
-      <button onMouseDown={(e) => e.preventDefault()} onClick={() => command('bold')} title="Жирный"><Bold size={18} /></button>
-      <button onMouseDown={(e) => e.preventDefault()} onClick={() => command('italic')} title="Курсив"><Italic size={18} /></button>
-      <button onMouseDown={(e) => e.preventDefault()} onClick={() => command('formatBlock', 'h2')} title="Подзаголовок"><Heading2 size={18} /></button>
-      <button onMouseDown={(e) => e.preventDefault()} onClick={() => command('formatBlock', 'pre')} title="Блок кода"><Code size={18} /></button>
-      <button onMouseDown={(e) => e.preventDefault()} onClick={insertSceneBreak} title="Разрыв сцены"><Minus size={18} /></button>
-      <button onMouseDown={(e) => e.preventDefault()} onClick={insertFootnote} title="Сноска"><Footprints size={18} /></button>
-      <span className="toolbar-spacer" />
-      <button onMouseDown={(e) => e.preventDefault()} onClick={() => command('undo')} title="Отменить"><Undo2 size={18} /></button>
-      <button onMouseDown={(e) => e.preventDefault()} onClick={() => command('redo')} title="Повторить"><Redo2 size={18} /></button>
-    </div>
-  )
-
   return (
     <div className="editor-shell">
-      {toolbar}
-      <div
-        ref={ref}
-        className="editor"
-        contentEditable
-        suppressContentEditableWarning
-        spellCheck
-        onInput={emit}
-      />
+      <div className="toolbar" aria-label="Форматирование">
+        <button onMouseDown={(e) => e.preventDefault()} onClick={() => command('bold')} title="Жирный"><Bold size={18} /></button>
+        <button onMouseDown={(e) => e.preventDefault()} onClick={() => command('italic')} title="Курсив"><Italic size={18} /></button>
+        <button onMouseDown={(e) => e.preventDefault()} onClick={() => command('formatBlock', 'h2')} title="Подзаголовок"><Heading2 size={18} /></button>
+        <button onMouseDown={(e) => e.preventDefault()} onClick={() => command('formatBlock', 'pre')} title="Блок кода"><Code size={18} /></button>
+        <button onMouseDown={(e) => e.preventDefault()} onClick={insertSceneBreak} title="Разрыв сцены"><Minus size={18} /></button>
+        <button onMouseDown={(e) => e.preventDefault()} onClick={insertFootnote} title="Сноска"><Footprints size={18} /></button>
+        <span className="toolbar-spacer" />
+        <button onMouseDown={(e) => e.preventDefault()} onClick={() => command('undo')} title="Отменить"><Undo2 size={18} /></button>
+        <button onMouseDown={(e) => e.preventDefault()} onClick={() => command('redo')} title="Повторить"><Redo2 size={18} /></button>
+      </div>
+      <div ref={ref} className="editor" contentEditable suppressContentEditableWarning spellCheck onInput={emit} />
     </div>
   )
 }
