@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { Bold, ChevronDown, CloudDownload, CloudUpload, Code, Footprints, Heading2, Italic, Minus, Redo2, Undo2 } from 'lucide-react'
 
 function escapeHtml(text: string) {
@@ -92,18 +93,39 @@ type Props = {
   unsynced: boolean
   syncing: boolean
   countdown: number | null
+  restoreScrollTop?: number
+  onScrollPosition?: (scrollTop: number) => void
 }
 
-export function BookEditor({ value, onChange, onSync, onPull, unsynced, syncing, countdown }: Props) {
+type MenuPosition = { left: number; top: number }
+
+export function BookEditor({ value, onChange, onSync, onPull, unsynced, syncing, countdown, restoreScrollTop = 0, onScrollPosition }: Props) {
   const ref = useRef<HTMLDivElement>(null)
+  const headingTriggerRef = useRef<HTMLButtonElement>(null)
   const lastValue = useRef('')
+  const restoredForValue = useRef('')
   const [headingMenu, setHeadingMenu] = useState(false)
+  const [menuPosition, setMenuPosition] = useState<MenuPosition>({ left: 0, top: 0 })
 
   useEffect(() => {
     if (!ref.current || value === lastValue.current) return
     ref.current.innerHTML = sourceToHtml(value)
     lastValue.current = value
   }, [value])
+
+  useEffect(() => {
+    if (!ref.current || restoredForValue.current === value) return
+    restoredForValue.current = value
+    requestAnimationFrame(() => {
+      window.scrollTo({ top: restoreScrollTop, behavior: 'auto' })
+    })
+  }, [value, restoreScrollTop])
+
+  useEffect(() => {
+    const savePosition = () => onScrollPosition?.(window.scrollY)
+    window.addEventListener('scroll', savePosition, { passive: true })
+    return () => window.removeEventListener('scroll', savePosition)
+  }, [onScrollPosition])
 
   useEffect(() => {
     const viewport = window.visualViewport
@@ -120,6 +142,39 @@ export function BookEditor({ value, onChange, onSync, onPull, unsynced, syncing,
       document.documentElement.style.removeProperty('--keyboard-offset'); document.documentElement.style.removeProperty('--visual-viewport-top'); document.documentElement.style.removeProperty('--visual-viewport-height')
     }
   }, [])
+
+  const positionHeadingMenu = () => {
+    const trigger = headingTriggerRef.current
+    if (!trigger) return
+    const rect = trigger.getBoundingClientRect()
+    const menuWidth = 126
+    const menuHeight = 132
+    const gap = 8
+    const isMobile = window.matchMedia('(max-width: 760px)').matches
+    const viewport = window.visualViewport
+    const viewportLeft = viewport?.offsetLeft ?? 0
+    const viewportTop = viewport?.offsetTop ?? 0
+    const viewportWidth = viewport?.width ?? window.innerWidth
+    const left = Math.min(Math.max(rect.left, viewportLeft + 8), viewportLeft + viewportWidth - menuWidth - 8)
+    const top = isMobile ? Math.max(viewportTop + 8, rect.top - menuHeight - gap) : rect.bottom + gap
+    setMenuPosition({ left, top })
+  }
+
+  useEffect(() => {
+    if (!headingMenu) return
+    positionHeadingMenu()
+    const update = () => positionHeadingMenu()
+    window.addEventListener('resize', update)
+    window.addEventListener('scroll', update, true)
+    window.visualViewport?.addEventListener('resize', update)
+    window.visualViewport?.addEventListener('scroll', update)
+    return () => {
+      window.removeEventListener('resize', update)
+      window.removeEventListener('scroll', update, true)
+      window.visualViewport?.removeEventListener('resize', update)
+      window.visualViewport?.removeEventListener('scroll', update)
+    }
+  }, [headingMenu])
 
   const emit = () => {
     if (!ref.current) return
@@ -144,6 +199,15 @@ export function BookEditor({ value, onChange, onSync, onPull, unsynced, syncing,
     emit()
   }
 
+  const headingPopup = headingMenu ? createPortal(
+    <div className="heading-menu heading-menu-portal" role="menu" style={{ left: menuPosition.left, top: menuPosition.top }}>
+      <button onMouseDown={(e) => e.preventDefault()} onClick={() => setHeading(1)} role="menuitem"><strong>H1</strong><span>##</span></button>
+      <button onMouseDown={(e) => e.preventDefault()} onClick={() => setHeading(2)} role="menuitem"><strong>H2</strong><span>###</span></button>
+      <button onMouseDown={(e) => e.preventDefault()} onClick={() => setHeading(3)} role="menuitem"><strong>H3</strong><span>####</span></button>
+    </div>,
+    document.body,
+  ) : null
+
   return (
     <div className={`editor-shell ${unsynced ? 'unsynced' : ''}`}>
       <div className="toolbar" aria-label="Форматирование">
@@ -152,12 +216,7 @@ export function BookEditor({ value, onChange, onSync, onPull, unsynced, syncing,
         <button onMouseDown={(e) => e.preventDefault()} onClick={() => command('bold')} title="Жирный"><Bold size={18} /></button>
         <button onMouseDown={(e) => e.preventDefault()} onClick={() => command('italic')} title="Курсив"><Italic size={18} /></button>
         <div className="heading-picker">
-          <button className="heading-trigger" onMouseDown={(e) => e.preventDefault()} onClick={() => setHeadingMenu((open) => !open)} title="Заголовок" aria-expanded={headingMenu}><Heading2 size={18} /><ChevronDown size={12} /></button>
-          {headingMenu && <div className="heading-menu" role="menu">
-            <button onMouseDown={(e) => e.preventDefault()} onClick={() => setHeading(1)} role="menuitem"><strong>H1</strong><span>##</span></button>
-            <button onMouseDown={(e) => e.preventDefault()} onClick={() => setHeading(2)} role="menuitem"><strong>H2</strong><span>###</span></button>
-            <button onMouseDown={(e) => e.preventDefault()} onClick={() => setHeading(3)} role="menuitem"><strong>H3</strong><span>####</span></button>
-          </div>}
+          <button ref={headingTriggerRef} className="heading-trigger" onMouseDown={(e) => e.preventDefault()} onClick={() => { positionHeadingMenu(); setHeadingMenu((open) => !open) }} title="Заголовок" aria-expanded={headingMenu}><Heading2 size={18} /><ChevronDown size={12} /></button>
         </div>
         <button onMouseDown={(e) => e.preventDefault()} onClick={() => command('formatBlock', 'pre')} title="Блок кода"><Code size={18} /></button>
         <button onMouseDown={(e) => e.preventDefault()} onClick={insertSceneBreak} title="Разрыв сцены"><Minus size={18} /></button>
@@ -167,6 +226,7 @@ export function BookEditor({ value, onChange, onSync, onPull, unsynced, syncing,
         <button className="pull-button" onMouseDown={(e) => e.preventDefault()} onClick={onPull} disabled={syncing} title="Скачать последнюю версию из GitHub" aria-label="Скачать последнюю версию из GitHub"><CloudDownload size={19} /></button>
         <button className="sync-button" onMouseDown={(e) => e.preventDefault()} onClick={onSync} disabled={syncing} title="Отправить изменения и проверить GitHub" aria-label="Отправить изменения и проверить GitHub"><CloudUpload size={19} /></button>
       </div>
+      {headingPopup}
       <div ref={ref} className="editor" contentEditable suppressContentEditableWarning spellCheck onInput={emit} />
     </div>
   )
