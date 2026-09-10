@@ -83,10 +83,41 @@ export default function App() {
         storage.setDraft(selected.fullName, chapter.path, { content: chapter.content, baseSha: chapter.sha, dirty: false, updatedAt: Date.now() })
         return chapter
       })
-      setProject(selected); setChapters(merged); setActivePath(merged[0]?.path || ''); setContent(merged[0]?.content || ''); setSync('idle'); setCountdown(null)
+      const rememberedPath = storage.getLastChapter(selected.fullName)
+      const remembered = merged.find((chapter) => chapter.path === rememberedPath)
+      const initial = remembered || merged[merged.length - 1] || null
+      setProject(selected)
+      setChapters(merged)
+      setActivePath(initial?.path || '')
+      setContent(initial?.content || '')
+      setSync(storage.getDraft(selected.fullName, initial?.path || '')?.dirty ? 'local' : 'idle')
+      setCountdown(null)
+      storage.setLastChapter(selected.fullName, initial?.path || '')
     } catch (e) { setError(e instanceof Error ? e.message : 'Не удалось открыть книгу') }
     finally { setBusy(false) }
   }
+
+  useEffect(() => {
+    if (!project || !activePath) return
+    const restore = () => window.scrollTo({ top: storage.getPosition(project.fullName, activePath), behavior: 'auto' })
+    const frame = window.requestAnimationFrame(() => window.requestAnimationFrame(restore))
+    return () => window.cancelAnimationFrame(frame)
+  }, [project?.fullName, activePath])
+
+  useEffect(() => {
+    if (!project || !activePath) return
+    let timer = 0
+    const savePosition = () => {
+      window.clearTimeout(timer)
+      timer = window.setTimeout(() => storage.setPosition(project.fullName, activePath, window.scrollY), 120)
+    }
+    window.addEventListener('scroll', savePosition, { passive: true })
+    return () => {
+      window.removeEventListener('scroll', savePosition)
+      window.clearTimeout(timer)
+      storage.setPosition(project.fullName, activePath, window.scrollY)
+    }
+  }, [project?.fullName, activePath])
 
   const openManualProject = async () => {
     if (!octokit || !manualRepo.trim()) return
@@ -99,7 +130,9 @@ export default function App() {
   }
 
   const selectChapter = (chapter: Chapter) => {
+    if (project && activePath) storage.setPosition(project.fullName, activePath, window.scrollY)
     setActivePath(chapter.path)
+    if (project) storage.setLastChapter(project.fullName, chapter.path)
     const local = project ? storage.getDraft(project.fullName, chapter.path) : null
     setContent(local?.content ?? chapter.content); setDrawer(false); setSync(local?.dirty ? 'local' : 'idle'); setCountdown(local?.dirty ? 60 : null)
   }
@@ -194,6 +227,7 @@ export default function App() {
       const next = [...chapters, chapter].sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }))
       setChapters(next)
       storage.setDraft(project.fullName, chapter.path, { content: '', baseSha: chapter.sha, dirty: false, updatedAt: Date.now() })
+      storage.setLastChapter(project.fullName, chapter.path)
       selectChapter(chapter)
     } catch (e) { setError(e instanceof Error ? e.message : 'Не удалось создать главу') }
     finally { setBusy(false) }
@@ -209,6 +243,8 @@ export default function App() {
     try {
       const renamed = await renameChapter(octokit, project, { ...chapter, content: chapter.path === activePath ? content : chapter.content }, newName)
       storage.moveDraft(project.fullName, chapter.path, renamed.path, { content: renamed.content, baseSha: renamed.sha, dirty: false, updatedAt: Date.now() })
+      storage.movePosition(project.fullName, chapter.path, renamed.path)
+      if (storage.getLastChapter(project.fullName) === chapter.path) storage.setLastChapter(project.fullName, renamed.path)
       const next = chapters.map((item) => item.path === chapter.path ? renamed : item).sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }))
       setChapters(next)
       if (activePath === chapter.path) setActivePath(renamed.path)
@@ -224,13 +260,17 @@ export default function App() {
     try {
       await deleteChapter(octokit, project, chapter)
       storage.removeDraft(project.fullName, chapter.path)
+      storage.removePosition(project.fullName, chapter.path)
       const next = chapters.filter((item) => item.path !== chapter.path)
       setChapters(next)
       if (activePath === chapter.path) {
-        const replacement = next[0] || null
+        const replacement = next[next.length - 1] || null
         setActivePath(replacement?.path || '')
         setContent(replacement?.content || '')
+        storage.setLastChapter(project.fullName, replacement?.path || '')
         setSync('idle'); setCountdown(null)
+      } else if (storage.getLastChapter(project.fullName) === chapter.path) {
+        storage.setLastChapter(project.fullName, next[next.length - 1]?.path || '')
       }
     } catch (e) { setError(e instanceof Error ? e.message : 'Не удалось удалить главу') }
     finally { setBusy(false) }
@@ -250,5 +290,5 @@ export default function App() {
 
   if (!project) return <main className="projects-page"><header className="projects-header"><div><h1>happy-writer</h1><span>Книги</span></div><div className="header-actions"><button className="icon-button" onClick={toggleTheme} title={themeTitle}>{themeIcon}</button><button className="icon-button" onClick={logout} title="Выйти"><LogOut size={18} /></button></div></header><section className="project-actions"><div className="repo-input"><Search size={18} /><input value={manualRepo} onChange={(e) => setManualRepo(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && void openManualProject()} placeholder="owner/repository" /><button onClick={() => void openManualProject()}>Открыть</button></div><button className="secondary" onClick={() => void refreshProjects()} disabled={busy}><RefreshCw size={17} className={busy ? 'spin' : ''} /> Найти book-framework репозитории</button></section>{error && <div className="error-box">{error}</div>}<div className="project-grid">{projects.map((item) => <button className="project-card" key={item.fullName} onClick={() => void openProject(item)}><BookOpen /><strong>{item.title}</strong><span>{item.fullName}</span></button>)}{!projects.length && !busy && <div className="empty">Проекты не найдены. Можно открыть репозиторий вручную или запустить поиск.</div>}</div></main>
 
-  return <div className="writer" onTouchStart={handleTouchStart} onTouchEnd={handleTouchEnd}>{drawer && <button className="drawer-scrim" onClick={() => setDrawer(false)} aria-label="Закрыть меню" />}<aside className={`sidebar ${drawer ? 'open' : ''}`}><div className="sidebar-head"><div className="sidebar-actions"><button className="back-button" onClick={() => { setProject(null); setDrawer(false) }}><ChevronLeft size={18} /> К книгам</button><button className="sidebar-theme" onClick={toggleTheme} title={themeTitle}>{themeIcon}</button></div><h2>{project.title}</h2><span>{project.fullName}</span></div><div className="chapter-list">{chapters.map((chapter) => <div className={`chapter-row ${chapter.path === activePath ? 'active' : ''}`} key={chapter.path}><button className="chapter-select" onClick={() => selectChapter(chapter)}><span>{chapter.title || chapter.name}</span><small>{chapter.name}</small></button><div className="chapter-actions"><button onClick={() => void rename(chapter)} title="Переименовать"><Pencil size={15} /></button><button onClick={() => void remove(chapter)} title="Удалить"><Trash2 size={15} /></button></div></div>)}</div><button className="add-chapter" onClick={() => void addChapter()}><Plus size={18} /> Новая глава</button></aside><section className="workspace"><header className="mobile-header"><button className="icon-button" onClick={() => setDrawer(true)}><Menu /></button><div><strong>{activeChapter?.title || project.title}</strong><span>{project.title}</span></div><button className="icon-button mobile-add" onClick={() => void addChapter()} title="Новая глава"><Plus size={18} /></button><button className="icon-button mobile-theme" onClick={toggleTheme} title={themeTitle}>{themeIcon}</button></header>{error && <div className="error-box editor-error">{error}</div>}{activeChapter ? <BookEditor value={content} onChange={edit} unsynced={sync === 'local' || sync === 'syncing'} syncing={sync === 'syncing'} countdown={sync === 'local' ? countdown : null} onPull={() => void pullCurrentChapter()} onSync={() => void syncCurrentChapter(true)} /> : <div className="empty editor-empty">В книге пока нет глав. Создай первую через меню.</div>}<div className={`sync-state ${sync}`}>{sync === 'local' && `Сохранено локально · автоотправка через ${countdown ?? 60} сек.`}{sync === 'syncing' && 'Синхронизация с GitHub…'}{sync === 'synced' && 'GitHub синхронизирован'}{sync === 'error' && 'Не удалось синхронизировать · локальная копия сохранена'}</div></section></div>
+  return <div className="writer" onTouchStart={handleTouchStart} onTouchEnd={handleTouchEnd}>{drawer && <button className="drawer-scrim" onClick={() => setDrawer(false)} aria-label="Закрыть меню" />}<aside className={`sidebar ${drawer ? 'open' : ''}`}><div className="sidebar-head"><div className="sidebar-actions"><button className="back-button" onClick={() => { if (project && activePath) storage.setPosition(project.fullName, activePath, window.scrollY); setProject(null); setDrawer(false) }}><ChevronLeft size={18} /> К книгам</button><button className="sidebar-theme" onClick={toggleTheme} title={themeTitle}>{themeIcon}</button></div><h2>{project.title}</h2><span>{project.fullName}</span></div><div className="chapter-list">{chapters.map((chapter) => <div className={`chapter-row ${chapter.path === activePath ? 'active' : ''}`} key={chapter.path}><button className="chapter-select" onClick={() => selectChapter(chapter)}><span>{chapter.title || chapter.name}</span><small>{chapter.name}</small></button><div className="chapter-actions"><button onClick={() => void rename(chapter)} title="Переименовать"><Pencil size={15} /></button><button onClick={() => void remove(chapter)} title="Удалить"><Trash2 size={15} /></button></div></div>)}</div><button className="add-chapter" onClick={() => void addChapter()}><Plus size={18} /> Новая глава</button></aside><section className="workspace"><header className="mobile-header"><button className="icon-button" onClick={() => setDrawer(true)}><Menu /></button><div><strong>{activeChapter?.title || project.title}</strong><span>{project.title}</span></div><button className="icon-button mobile-add" onClick={() => void addChapter()} title="Новая глава"><Plus size={18} /></button><button className="icon-button mobile-theme" onClick={toggleTheme} title={themeTitle}>{themeIcon}</button></header>{error && <div className="error-box editor-error">{error}</div>}{activeChapter ? <BookEditor value={content} onChange={edit} unsynced={sync === 'local' || sync === 'syncing'} syncing={sync === 'syncing'} countdown={sync === 'local' ? countdown : null} onPull={() => void pullCurrentChapter()} onSync={() => void syncCurrentChapter(true)} /> : <div className="empty editor-empty">В книге пока нет глав. Создай первую через меню.</div>}<div className={`sync-state ${sync}`}>{sync === 'local' && `Сохранено локально · автоотправка через ${countdown ?? 60} сек.`}{sync === 'syncing' && 'Синхронизация с GitHub…'}{sync === 'synced' && 'GitHub синхронизирован'}{sync === 'error' && 'Не удалось синхронизировать · локальная копия сохранена'}</div></section></div>
 }
