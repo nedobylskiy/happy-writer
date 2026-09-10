@@ -35,8 +35,10 @@
 @media (max-width: 760px) {
   .chapter-actions { opacity: 1; }
   .toolbar {
-    bottom: var(--keyboard-offset, 0px) !important;
-    transition: bottom .08s linear;
+    --toolbar-height: 58px;
+    bottom: auto !important;
+    top: calc(var(--visual-viewport-top, 0px) + var(--visual-viewport-height, 100vh) - var(--toolbar-height)) !important;
+    transition: top .08s linear;
   }
   .sync-state {
     bottom: calc(var(--keyboard-offset, 0px) + 70px) !important;
