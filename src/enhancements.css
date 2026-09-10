@@ -32,6 +32,34 @@
 :root[data-theme='dark'] .chapter-actions button { color: #9f9589 !important; }
 :root[data-theme='dark'] .chapter-actions button:hover { color: #eee8df !important; background: rgba(255,255,255,.07) !important; }
 
+.heading-picker { position: relative; flex: 0 0 auto; }
+.toolbar .heading-trigger { width: 48px; display: inline-flex; align-items: center; justify-content: center; gap: 1px; }
+.heading-menu {
+  position: absolute;
+  left: 0;
+  top: calc(100% + 8px);
+  z-index: 60;
+  min-width: 126px;
+  padding: 6px;
+  border: 1px solid #ddd4c8;
+  border-radius: 12px;
+  background: #fffdf9;
+  box-shadow: 0 12px 34px rgba(40,32,24,.16);
+}
+.heading-menu button {
+  width: 100% !important;
+  height: 38px !important;
+  padding: 0 10px !important;
+  display: flex !important;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  text-align: left;
+}
+.heading-menu button strong { font-size: 14px; }
+.heading-menu button span { opacity: .55; font: 12px/1 ui-monospace, SFMono-Regular, Consolas, monospace; }
+:root[data-theme='dark'] .heading-menu { background: #25221f; border-color: #3b3631; box-shadow: 0 12px 34px rgba(0,0,0,.35); }
+
 @media (max-width: 760px) {
   .chapter-actions { opacity: 1; }
   .toolbar {
@@ -39,6 +67,10 @@
     bottom: auto !important;
     top: calc(var(--visual-viewport-top, 0px) + var(--visual-viewport-height, 100vh) - var(--toolbar-height)) !important;
     transition: top .08s linear;
+  }
+  .heading-menu {
+    top: auto;
+    bottom: calc(100% + 8px);
   }
   .sync-state {
     bottom: calc(var(--keyboard-offset, 0px) + 70px) !important;
