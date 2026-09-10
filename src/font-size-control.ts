@@ -1,5 +1,5 @@
 const STORAGE_KEY = 'happy-writer:editor-font-size'
-const MIN = 17
+const MIN = 15
 const MAX = 22
 const DEFAULT = 19
 
