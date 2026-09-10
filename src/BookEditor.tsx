@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { Bold, ChevronDown, CloudDownload, CloudUpload, Code, Footprints, Heading2, Italic, Minus, Redo2, Undo2 } from 'lucide-react'
+import { Bold, Check, ChevronDown, CircleAlert, CloudDownload, CloudUpload, Code, Footprints, Heading2, Italic, LoaderCircle, Minus, Redo2, Undo2 } from 'lucide-react'
 
 function escapeHtml(text: string) {
   return text.replace(/[&<>]/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[char]!))
@@ -85,6 +85,8 @@ function htmlToSource(root: HTMLElement) {
   return `${blocks.join('\n\n').trim()}\n`
 }
 
+type SyncState = 'idle' | 'local' | 'syncing' | 'synced' | 'error'
+
 type Props = {
   value: string
   onChange: (value: string) => void
@@ -92,6 +94,7 @@ type Props = {
   onPull: () => void
   unsynced: boolean
   syncing: boolean
+  syncState: SyncState
   countdown: number | null
   restoreKey?: string
   restoreScrollTop?: number
@@ -100,7 +103,7 @@ type Props = {
 
 type MenuPosition = { left: number; top: number }
 
-export function BookEditor({ value, onChange, onSync, onPull, unsynced, syncing, countdown, restoreKey = '', restoreScrollTop = 0, onScrollPosition }: Props) {
+export function BookEditor({ value, onChange, onSync, onPull, unsynced, syncing, syncState, countdown, restoreKey = '', restoreScrollTop = 0, onScrollPosition }: Props) {
   const ref = useRef<HTMLDivElement>(null)
   const headingTriggerRef = useRef<HTMLButtonElement>(null)
   const lastValue = useRef('')
@@ -209,6 +212,14 @@ export function BookEditor({ value, onChange, onSync, onPull, unsynced, syncing,
     document.body,
   ) : null
 
+  const syncStatus = syncState === 'error'
+    ? <span className="toolbar-sync-status error" title="Ошибка синхронизации"><CircleAlert size={17} /></span>
+    : syncState === 'syncing'
+      ? <span className="toolbar-sync-status syncing" title="Синхронизация"><LoaderCircle size={17} className="spin" /></span>
+      : syncState === 'local'
+        ? <span className="toolbar-sync-status pending" title="Ожидает синхронизации"><CloudUpload size={17} />{countdown !== null && <span>{Math.floor(countdown / 60)}:{String(countdown % 60).padStart(2, '0')}</span>}</span>
+        : <span className="toolbar-sync-status ok" title="Синхронизировано"><Check size={18} /></span>
+
   return (
     <div className={`editor-shell ${unsynced ? 'unsynced' : ''}`}>
       <div className="toolbar" aria-label="Форматирование">
@@ -223,7 +234,7 @@ export function BookEditor({ value, onChange, onSync, onPull, unsynced, syncing,
         <button onMouseDown={(e) => e.preventDefault()} onClick={insertSceneBreak} title="Разрыв сцены"><Minus size={18} /></button>
         <button onMouseDown={(e) => e.preventDefault()} onClick={insertFootnote} title="Сноска"><Footprints size={18} /></button>
         <span className="toolbar-spacer" />
-        {countdown !== null && <span className="autosync-countdown" title="До автоотправки">{Math.floor(countdown / 60)}:{String(countdown % 60).padStart(2, '0')}</span>}
+        {syncStatus}
         <button className="pull-button" onMouseDown={(e) => e.preventDefault()} onClick={onPull} disabled={syncing} title="Скачать последнюю версию из GitHub" aria-label="Скачать последнюю версию из GitHub"><CloudDownload size={19} /></button>
         <button className="sync-button" onMouseDown={(e) => e.preventDefault()} onClick={onSync} disabled={syncing} title="Отправить изменения и проверить GitHub" aria-label="Отправить изменения и проверить GitHub"><CloudUpload size={19} /></button>
       </div>
