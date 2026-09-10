@@ -1,0 +1,27 @@
+.editor { font-size: var(--editor-font-size, 19px) !important; }
+
+.editor-font-size-control {
+  flex: 0 0 auto;
+  margin: 4px 12px 2px;
+  padding: 10px 10px 8px;
+  border-top: 1px solid rgba(255,255,255,.08);
+  color: #cfc7bc;
+}
+.editor-font-size-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 7px;
+}
+.editor-font-size-label { font-size: 12px; font-weight: 650; }
+.editor-font-size-value { font-size: 11px; opacity: .6; font-variant-numeric: tabular-nums; }
+.editor-font-size-control input[type='range'] {
+  width: 100%;
+  margin: 0;
+  accent-color: #b18f69;
+}
+
+@media (max-width: 760px) {
+  .editor-font-size-control { margin-bottom: 0; }
+}
