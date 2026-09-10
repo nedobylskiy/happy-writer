@@ -249,6 +249,7 @@ export default function App() {
         <header className="mobile-header">
           <button className="icon-button" onClick={() => setDrawer(true)}><Menu /></button>
           <div><strong>{activeChapter?.title || project.title}</strong><span>{project.title}</span></div>
+          <button className="icon-button mobile-add" onClick={() => void addChapter()} title="Новая глава" aria-label="Новая глава"><Plus size={18} /></button>
           <button className="icon-button mobile-theme" onClick={toggleTheme} title={themeTitle} aria-label={themeTitle}>{themeIcon}</button>
         </header>
         {error && <div className="error-box editor-error">{error}</div>}
