@@ -1,5 +1,5 @@
-import { useEffect, useRef } from 'react'
-import { Bold, Code, Footprints, Heading2, Italic, Minus, Redo2, Undo2 } from 'lucide-react'
+import { useEffect, useRef, useState } from 'react'
+import { Bold, ChevronDown, Code, Footprints, Heading2, Italic, Minus, Redo2, Undo2 } from 'lucide-react'
 
 function escapeHtml(text: string) {
   return text.replace(/[&<>]/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[char]!))
@@ -119,6 +119,7 @@ function htmlToSource(root: HTMLElement) {
 export function BookEditor({ value, onChange }: { value: string; onChange: (value: string) => void }) {
   const ref = useRef<HTMLDivElement>(null)
   const lastValue = useRef('')
+  const [headingMenu, setHeadingMenu] = useState(false)
 
   useEffect(() => {
     if (!ref.current || value === lastValue.current) return
@@ -132,6 +133,8 @@ export function BookEditor({ value, onChange }: { value: string; onChange: (valu
     const update = () => {
       const keyboard = Math.max(0, window.innerHeight - viewport.height - viewport.offsetTop)
       document.documentElement.style.setProperty('--keyboard-offset', `${keyboard}px`)
+      document.documentElement.style.setProperty('--visual-viewport-top', `${viewport.offsetTop}px`)
+      document.documentElement.style.setProperty('--visual-viewport-height', `${viewport.height}px`)
     }
     update()
     viewport.addEventListener('resize', update)
@@ -140,6 +143,8 @@ export function BookEditor({ value, onChange }: { value: string; onChange: (valu
       viewport.removeEventListener('resize', update)
       viewport.removeEventListener('scroll', update)
       document.documentElement.style.removeProperty('--keyboard-offset')
+      document.documentElement.style.removeProperty('--visual-viewport-top')
+      document.documentElement.style.removeProperty('--visual-viewport-height')
     }
   }, [])
 
@@ -154,6 +159,12 @@ export function BookEditor({ value, onChange }: { value: string; onChange: (valu
     ref.current?.focus()
     document.execCommand(name, false, value)
     emit()
+  }
+
+  const setHeading = (visualLevel: 1 | 2 | 3) => {
+    // book-framework starts internal headings at ##, so UI H1/H2/H3 maps to ##/###/####.
+    command('formatBlock', `h${visualLevel + 1}`)
+    setHeadingMenu(false)
   }
 
   const insertSceneBreak = () => {
@@ -187,7 +198,18 @@ export function BookEditor({ value, onChange }: { value: string; onChange: (valu
       <div className="toolbar" aria-label="Форматирование">
         <button onMouseDown={(e) => e.preventDefault()} onClick={() => command('bold')} title="Жирный"><Bold size={18} /></button>
         <button onMouseDown={(e) => e.preventDefault()} onClick={() => command('italic')} title="Курсив"><Italic size={18} /></button>
-        <button onMouseDown={(e) => e.preventDefault()} onClick={() => command('formatBlock', 'h2')} title="Подзаголовок"><Heading2 size={18} /></button>
+        <div className="heading-picker">
+          <button className="heading-trigger" onMouseDown={(e) => e.preventDefault()} onClick={() => setHeadingMenu((open) => !open)} title="Заголовок" aria-expanded={headingMenu}>
+            <Heading2 size={18} /><ChevronDown size={12} />
+          </button>
+          {headingMenu && (
+            <div className="heading-menu" role="menu">
+              <button onMouseDown={(e) => e.preventDefault()} onClick={() => setHeading(1)} role="menuitem"><strong>H1</strong><span>##</span></button>
+              <button onMouseDown={(e) => e.preventDefault()} onClick={() => setHeading(2)} role="menuitem"><strong>H2</strong><span>###</span></button>
+              <button onMouseDown={(e) => e.preventDefault()} onClick={() => setHeading(3)} role="menuitem"><strong>H3</strong><span>####</span></button>
+            </div>
+          )}
+        </div>
         <button onMouseDown={(e) => e.preventDefault()} onClick={() => command('formatBlock', 'pre')} title="Блок кода"><Code size={18} /></button>
         <button onMouseDown={(e) => e.preventDefault()} onClick={insertSceneBreak} title="Разрыв сцены"><Minus size={18} /></button>
         <button onMouseDown={(e) => e.preventDefault()} onClick={insertFootnote} title="Сноска"><Footprints size={18} /></button>
