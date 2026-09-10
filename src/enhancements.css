@@ -143,8 +143,8 @@
 .autosync-toggle.off svg { color: #9d9489; }
 .autosync-toggle:hover { background: #413b35; }
 
-.file-heading { min-width: 0; display: grid; grid-template-columns: minmax(0, 1fr) auto; column-gap: 7px; align-items: center; }
-.file-heading > strong { grid-column: 1 / -1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.file-heading { min-width: 0; }
+.file-heading > strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .file-heading > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .version-switch {
   border: 0;
@@ -202,22 +202,28 @@
   .mobile-header { position: relative; }
   .mobile-header:has(.version-switch) .mobile-add { display: none; }
   .mobile-header .file-heading {
-    display: block;
-    min-width: 0;
+    display: flex !important;
+    flex: 1 1 auto !important;
+    min-width: 0 !important;
+    flex-direction: column !important;
+    justify-content: center;
     padding-right: 0;
   }
   .mobile-header .file-heading > strong,
   .mobile-header .file-heading > span {
     display: block;
+    width: 100%;
     min-width: 0;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
   }
+
+  /* The version toggle lives in the old + slot and only its state changes. */
   .mobile-header .file-heading .version-switch {
     position: absolute;
-    right: 62px;
-    top: 9px;
+    right: 60px;
+    top: 8px;
     width: 42px;
     height: 42px;
     padding: 0;
@@ -227,10 +233,23 @@
     font-size: 0;
     background: #eee7dc;
     color: #4c443b;
+    box-shadow: none;
   }
-  .mobile-header .file-heading .version-switch svg { width: 18px; height: 18px; }
+  .mobile-header .file-heading .version-switch svg { width: 19px; height: 19px; }
+
+  /* Edited is the active state: same button, visibly toggled on. */
+  .mobile-header .file-heading .version-switch[title="Открыть исходную версию"] {
+    background: #dcebd9;
+    color: #4f754d;
+    box-shadow: inset 0 0 0 1px rgba(79,117,77,.18);
+  }
   :root[data-theme='dark'] .mobile-header .file-heading .version-switch {
     background: #2d2924;
     color: #ddd5ca;
+  }
+  :root[data-theme='dark'] .mobile-header .file-heading .version-switch[title="Открыть исходную версию"] {
+    background: #273328;
+    color: #9bc495;
+    box-shadow: inset 0 0 0 1px rgba(155,196,149,.18);
   }
 }
