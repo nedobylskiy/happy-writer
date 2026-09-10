@@ -102,10 +102,25 @@
     bottom: auto !important;
     top: calc(var(--visual-viewport-top, 0px) + var(--visual-viewport-height, 100vh) - var(--toolbar-height)) !important;
     transition: top .08s linear;
+    overflow-x: auto !important;
+    overflow-y: hidden !important;
+    justify-content: flex-start !important;
+    touch-action: pan-x;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior-x: contain;
+    scrollbar-width: none;
   }
+  .toolbar::-webkit-scrollbar { display: none; }
+  .toolbar > button,
+  .toolbar > .heading-picker,
+  .toolbar > .toolbar-spacer,
+  .toolbar > .autosync-countdown { flex-shrink: 0; }
   .heading-menu {
+    position: fixed;
+    left: 116px;
     top: auto;
-    bottom: calc(100% + 8px);
+    bottom: calc(var(--keyboard-offset, 0px) + 66px);
+    z-index: 2000;
   }
   .sync-state {
     bottom: calc(var(--keyboard-offset, 0px) + 70px) !important;
