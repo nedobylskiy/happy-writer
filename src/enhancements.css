@@ -60,6 +60,28 @@
 .heading-menu button span { opacity: .55; font: 12px/1 ui-monospace, SFMono-Regular, Consolas, monospace; }
 :root[data-theme='dark'] .heading-menu { background: #25221f; border-color: #3b3631; box-shadow: 0 12px 34px rgba(0,0,0,.35); }
 
+.editor-shell .editor { transition: background-color .18s ease, box-shadow .18s ease; }
+.editor-shell.unsynced .editor {
+  background: #fbfff9;
+  box-shadow: 0 0 0 1px #dfeadd;
+}
+:root[data-theme='dark'] .editor-shell.unsynced .editor {
+  background: #1e241e;
+  box-shadow: 0 0 0 1px #344236;
+}
+.toolbar .sync-button { position: relative; }
+.toolbar .sync-button:disabled { opacity: .45; cursor: wait; }
+.editor-shell.unsynced .sync-button::after {
+  content: '';
+  position: absolute;
+  right: 5px;
+  top: 5px;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #6fa36d;
+}
+
 @media (max-width: 760px) {
   .chapter-actions { opacity: 1; }
   .toolbar {
