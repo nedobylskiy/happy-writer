@@ -10,6 +10,7 @@ export type Theme = 'light' | 'dark'
 const tokenKey = 'happy-writer:github-token'
 const projectKey = 'happy-writer:projects'
 const themeKey = 'happy-writer:theme'
+const autoSyncKey = 'happy-writer:auto-sync'
 const draftKey = (project: string, path: string) => `happy-writer:draft:${project}:${path}`
 const lastChapterKey = (project: string) => `happy-writer:last-chapter:${project}`
 const positionKey = (project: string, path: string) => `happy-writer:position:${project}:${path}`
@@ -22,6 +23,12 @@ export const storage = {
   setProjects: (projects: string[]) => localStorage.setItem(projectKey, JSON.stringify(projects)),
   getTheme: (): Theme => localStorage.getItem(themeKey) === 'dark' ? 'dark' : 'light',
   setTheme: (theme: Theme) => localStorage.setItem(themeKey, theme),
+  getAutoSync() {
+    return localStorage.getItem(autoSyncKey) !== 'false'
+  },
+  setAutoSync(enabled: boolean) {
+    localStorage.setItem(autoSyncKey, String(enabled))
+  },
   getLastChapter(project: string) {
     return localStorage.getItem(lastChapterKey(project)) || ''
   },
