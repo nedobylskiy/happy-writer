@@ -79,15 +79,18 @@ export async function loadProject(octokit: Octokit, fullName: string): Promise<P
   return { owner, repo, fullName, title: config.title || repo, defaultBranch: meta.default_branch }
 }
 
+export async function loadChapter(octokit: Octokit, project: Project, path: string): Promise<Chapter> {
+  const { data: file } = await octokit.repos.getContent({ owner: project.owner, repo: project.repo, path })
+  if (Array.isArray(file) || file.type !== 'file' || !('content' in file)) throw new Error(`Не удалось прочитать ${path}`)
+  const name = path.split('/').pop() || path
+  return { path, name, title: chapterTitle(name), sha: file.sha, content: decodeBase64Utf8(file.content) }
+}
+
 export async function loadChapters(octokit: Octokit, project: Project): Promise<Chapter[]> {
   const { data } = await octokit.repos.getContent({ owner: project.owner, repo: project.repo, path: 'manuscript/chapters' })
   if (!Array.isArray(data)) throw new Error('manuscript/chapters должен быть папкой')
   const files = data.filter((item) => item.type === 'file' && /\.(md|txt)$/i.test(item.name)).sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' }))
-  return mapLimit(files, 6, async (item) => {
-    const { data: file } = await octokit.repos.getContent({ owner: project.owner, repo: project.repo, path: item.path })
-    if (Array.isArray(file) || file.type !== 'file' || !('content' in file)) throw new Error(`Не удалось прочитать ${item.path}`)
-    return { path: item.path, name: item.name, title: chapterTitle(item.name), sha: file.sha, content: decodeBase64Utf8(file.content) }
-  })
+  return mapLimit(files, 6, async (item) => loadChapter(octokit, project, item.path))
 }
 
 export async function saveChapter(octokit: Octokit, project: Project, chapter: Chapter, content: string) {
