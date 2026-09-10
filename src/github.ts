@@ -45,6 +45,10 @@ async function mapLimit<T, R>(items: T[], limit: number, fn: (item: T) => Promis
   return out
 }
 
+function chapterTitle(name: string) {
+  return name.replace(/\.(md|txt)$/i, '').replace(/^\d+[. _-]*/, '')
+}
+
 export async function discoverProjects(octokit: Octokit): Promise<Project[]> {
   const { data: repos } = await octokit.repos.listForAuthenticatedUser({
     per_page: 100,
@@ -57,18 +61,9 @@ export async function discoverProjects(octokit: Octokit): Promise<Project[]> {
       const { data } = await octokit.repos.getContent({ owner: repo.owner.login, repo: repo.name, path: 'book.config.json' })
       if (Array.isArray(data) || data.type !== 'file' || !('content' in data)) return null
       const config = JSON.parse(decodeBase64Utf8(data.content)) as { title?: string }
-      return {
-        owner: repo.owner.login,
-        repo: repo.name,
-        fullName: repo.full_name,
-        title: config.title || repo.name,
-        defaultBranch: repo.default_branch,
-      } satisfies Project
-    } catch {
-      return null
-    }
+      return { owner: repo.owner.login, repo: repo.name, fullName: repo.full_name, title: config.title || repo.name, defaultBranch: repo.default_branch } satisfies Project
+    } catch { return null }
   })
-
   return found.filter((project): project is Project => Boolean(project))
 }
 
@@ -87,49 +82,33 @@ export async function loadProject(octokit: Octokit, fullName: string): Promise<P
 export async function loadChapters(octokit: Octokit, project: Project): Promise<Chapter[]> {
   const { data } = await octokit.repos.getContent({ owner: project.owner, repo: project.repo, path: 'manuscript/chapters' })
   if (!Array.isArray(data)) throw new Error('manuscript/chapters должен быть папкой')
-  const files = data
-    .filter((item) => item.type === 'file' && /\.(md|txt)$/i.test(item.name))
-    .sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' }))
-
+  const files = data.filter((item) => item.type === 'file' && /\.(md|txt)$/i.test(item.name)).sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' }))
   return mapLimit(files, 6, async (item) => {
     const { data: file } = await octokit.repos.getContent({ owner: project.owner, repo: project.repo, path: item.path })
     if (Array.isArray(file) || file.type !== 'file' || !('content' in file)) throw new Error(`Не удалось прочитать ${item.path}`)
-    return {
-      path: item.path,
-      name: item.name,
-      title: item.name.replace(/\.(md|txt)$/i, '').replace(/^\d+[. _-]*/, ''),
-      sha: file.sha,
-      content: decodeBase64Utf8(file.content),
-    }
+    return { path: item.path, name: item.name, title: chapterTitle(item.name), sha: file.sha, content: decodeBase64Utf8(file.content) }
   })
 }
 
 export async function saveChapter(octokit: Octokit, project: Project, chapter: Chapter, content: string) {
-  const response = await octokit.repos.createOrUpdateFileContents({
-    owner: project.owner,
-    repo: project.repo,
-    path: chapter.path,
-    message: `write: update ${chapter.name}`,
-    content: encodeBase64Utf8(content),
-    sha: chapter.sha || undefined,
-  })
+  const response = await octokit.repos.createOrUpdateFileContents({ owner: project.owner, repo: project.repo, path: chapter.path, message: `write: update ${chapter.name}`, content: encodeBase64Utf8(content), sha: chapter.sha || undefined })
   return response.data.content?.sha || chapter.sha
 }
 
 export async function createChapter(octokit: Octokit, project: Project, name: string, content = ''): Promise<Chapter> {
   const path = `manuscript/chapters/${name}`
-  const response = await octokit.repos.createOrUpdateFileContents({
-    owner: project.owner,
-    repo: project.repo,
-    path,
-    message: `write: add ${name}`,
-    content: encodeBase64Utf8(content),
-  })
-  return {
-    path,
-    name,
-    title: name.replace(/\.(md|txt)$/i, '').replace(/^\d+[. _-]*/, ''),
-    sha: response.data.content?.sha || '',
-    content,
-  }
+  const response = await octokit.repos.createOrUpdateFileContents({ owner: project.owner, repo: project.repo, path, message: `write: add ${name}`, content: encodeBase64Utf8(content) })
+  return { path, name, title: chapterTitle(name), sha: response.data.content?.sha || '', content }
+}
+
+export async function renameChapter(octokit: Octokit, project: Project, chapter: Chapter, newName: string): Promise<Chapter> {
+  const path = `manuscript/chapters/${newName}`
+  if (path === chapter.path) return chapter
+  const created = await octokit.repos.createOrUpdateFileContents({ owner: project.owner, repo: project.repo, path, message: `write: rename ${chapter.name} to ${newName}`, content: encodeBase64Utf8(chapter.content) })
+  await octokit.repos.deleteFile({ owner: project.owner, repo: project.repo, path: chapter.path, message: `write: remove old chapter path ${chapter.name}`, sha: chapter.sha })
+  return { ...chapter, path, name: newName, title: chapterTitle(newName), sha: created.data.content?.sha || '' }
+}
+
+export async function deleteChapter(octokit: Octokit, project: Project, chapter: Chapter) {
+  await octokit.repos.deleteFile({ owner: project.owner, repo: project.repo, path: chapter.path, message: `write: delete ${chapter.name}`, sha: chapter.sha })
 }
