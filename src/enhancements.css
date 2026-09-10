@@ -32,16 +32,14 @@
 :root[data-theme='dark'] .chapter-actions button { color: #9f9589 !important; }
 :root[data-theme='dark'] .chapter-actions button:hover { color: #eee8df !important; background: rgba(255,255,255,.07) !important; }
 
-/* Keep toolbar popovers above the editable page, which has its own stacking context on mobile. */
-.editor-shell { position: relative; isolation: isolate; }
-.toolbar { z-index: 120 !important; overflow: visible !important; }
-.heading-picker { position: relative; flex: 0 0 auto; z-index: 130; }
+.heading-picker { position: relative; z-index: 1002; flex: 0 0 auto; }
+.toolbar { z-index: 1000 !important; overflow: visible !important; }
 .toolbar .heading-trigger { width: 48px; display: inline-flex; align-items: center; justify-content: center; gap: 1px; }
 .heading-menu {
   position: absolute;
   left: 0;
   top: calc(100% + 8px);
-  z-index: 1000;
+  z-index: 1003;
   min-width: 126px;
   padding: 6px;
   border: 1px solid #ddd4c8;
@@ -63,7 +61,8 @@
 .heading-menu button span { opacity: .55; font: 12px/1 ui-monospace, SFMono-Regular, Consolas, monospace; }
 :root[data-theme='dark'] .heading-menu { background: #25221f; border-color: #3b3631; box-shadow: 0 12px 34px rgba(0,0,0,.35); }
 
-.editor-shell .editor { position: relative; z-index: 1; transition: background-color .18s ease, box-shadow .18s ease; }
+.editor-shell { position: relative; isolation: isolate; }
+.editor-shell .editor { position: relative; z-index: 0; transition: background-color .18s ease, box-shadow .18s ease; }
 .editor-shell.unsynced .editor {
   background: #fbfff9;
   box-shadow: 0 0 0 1px #dfeadd;
@@ -72,8 +71,10 @@
   background: #1e241e;
   box-shadow: 0 0 0 1px #344236;
 }
-.toolbar .sync-button { position: relative; }
-.toolbar .sync-button:disabled { opacity: .45; cursor: wait; }
+.toolbar .sync-button,
+.toolbar .pull-button { position: relative; }
+.toolbar .sync-button:disabled,
+.toolbar .pull-button:disabled { opacity: .45; cursor: wait; }
 .editor-shell.unsynced .sync-button::after {
   content: '';
   position: absolute;
@@ -84,6 +85,15 @@
   border-radius: 50%;
   background: #6fa36d;
 }
+.autosync-countdown {
+  flex: 0 0 auto;
+  min-width: 38px;
+  text-align: center;
+  font: 600 12px/1 ui-monospace, SFMono-Regular, Consolas, monospace;
+  color: #7c746a;
+  opacity: .9;
+}
+:root[data-theme='dark'] .autosync-countdown { color: #aaa095; }
 
 @media (max-width: 760px) {
   .chapter-actions { opacity: 1; }
@@ -92,13 +102,10 @@
     bottom: auto !important;
     top: calc(var(--visual-viewport-top, 0px) + var(--visual-viewport-height, 100vh) - var(--toolbar-height)) !important;
     transition: top .08s linear;
-    z-index: 120 !important;
   }
-  .heading-picker { z-index: 130; }
   .heading-menu {
     top: auto;
     bottom: calc(100% + 8px);
-    z-index: 1000;
   }
   .sync-state {
     bottom: calc(var(--keyboard-offset, 0px) + 70px) !important;
