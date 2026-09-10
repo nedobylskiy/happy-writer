@@ -93,17 +93,18 @@ type Props = {
   unsynced: boolean
   syncing: boolean
   countdown: number | null
+  restoreKey?: string
   restoreScrollTop?: number
   onScrollPosition?: (scrollTop: number) => void
 }
 
 type MenuPosition = { left: number; top: number }
 
-export function BookEditor({ value, onChange, onSync, onPull, unsynced, syncing, countdown, restoreScrollTop = 0, onScrollPosition }: Props) {
+export function BookEditor({ value, onChange, onSync, onPull, unsynced, syncing, countdown, restoreKey = '', restoreScrollTop = 0, onScrollPosition }: Props) {
   const ref = useRef<HTMLDivElement>(null)
   const headingTriggerRef = useRef<HTMLButtonElement>(null)
   const lastValue = useRef('')
-  const restoredForValue = useRef('')
+  const restoredForKey = useRef('')
   const [headingMenu, setHeadingMenu] = useState(false)
   const [menuPosition, setMenuPosition] = useState<MenuPosition>({ left: 0, top: 0 })
 
@@ -114,12 +115,12 @@ export function BookEditor({ value, onChange, onSync, onPull, unsynced, syncing,
   }, [value])
 
   useEffect(() => {
-    if (!ref.current || restoredForValue.current === value) return
-    restoredForValue.current = value
+    if (!restoreKey || restoredForKey.current === restoreKey) return
+    restoredForKey.current = restoreKey
     requestAnimationFrame(() => {
       window.scrollTo({ top: restoreScrollTop, behavior: 'auto' })
     })
-  }, [value, restoreScrollTop])
+  }, [restoreKey, restoreScrollTop])
 
   useEffect(() => {
     const savePosition = () => onScrollPosition?.(window.scrollY)
