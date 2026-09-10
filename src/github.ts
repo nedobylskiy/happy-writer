@@ -86,11 +86,27 @@ export async function loadChapter(octokit: Octokit, project: Project, path: stri
   return { path, name, title: chapterTitle(name), sha: file.sha, content: decodeBase64Utf8(file.content) }
 }
 
-export async function loadChapters(octokit: Octokit, project: Project): Promise<Chapter[]> {
-  const { data } = await octokit.repos.getContent({ owner: project.owner, repo: project.repo, path: 'manuscript/chapters' })
-  if (!Array.isArray(data)) throw new Error('manuscript/chapters должен быть папкой')
-  const files = data.filter((item) => item.type === 'file' && /\.(md|txt)$/i.test(item.name)).sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' }))
+async function loadChapterDirectory(octokit: Octokit, project: Project, path: string): Promise<Chapter[]> {
+  const { data } = await octokit.repos.getContent({ owner: project.owner, repo: project.repo, path })
+  if (!Array.isArray(data)) throw new Error(`${path} должен быть папкой`)
+  const files = data
+    .filter((item) => item.type === 'file' && /\.(md|txt)$/i.test(item.name) && item.name !== 'EDITING_RULES.md')
+    .sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' }))
   return mapLimit(files, 6, async (item) => loadChapter(octokit, project, item.path))
+}
+
+export async function loadChapters(octokit: Octokit, project: Project): Promise<Chapter[]> {
+  return loadChapterDirectory(octokit, project, 'manuscript/chapters')
+}
+
+export async function loadEditedChapters(octokit: Octokit, project: Project): Promise<Chapter[]> {
+  try {
+    return await loadChapterDirectory(octokit, project, 'manuscript/edited')
+  } catch (error) {
+    const status = (error as { status?: number })?.status
+    if (status === 404) return []
+    throw error
+  }
 }
 
 export async function saveChapter(octokit: Octokit, project: Project, chapter: Chapter, content: string) {
