@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { BookOpen, ChevronLeft, LogOut, Menu, Moon, Pencil, Plus, RefreshCw, Search, Sun, Trash2 } from 'lucide-react'
 import { BookEditor } from './BookEditor'
-import { Chapter, createChapter, createGithub, deleteChapter, discoverProjects, loadChapters, loadProject, Project, renameChapter, saveChapter } from './github'
+import { Chapter, createChapter, createGithub, deleteChapter, discoverProjects, loadChapter, loadChapters, loadProject, Project, renameChapter, saveChapter } from './github'
 import { storage } from './storage'
 
 type SyncState = 'idle' | 'local' | 'syncing' | 'synced' | 'error'
@@ -110,19 +110,58 @@ export default function App() {
     setChapters((items) => items.map((item) => item.path === activeChapter.path ? { ...item, content: next } : item))
   }
 
+  const syncCurrentChapter = async (checkRemote = false) => {
+    if (!octokit || !project || !activeChapter) return
+    setSync('syncing'); setError('')
+    try {
+      let current = activeChapter
+      if (checkRemote) {
+        const remote = await loadChapter(octokit, project, activeChapter.path)
+        const local = storage.getDraft(project.fullName, activeChapter.path)
+        if (remote.sha !== activeChapter.sha && local?.dirty) {
+          setSync('local')
+          setError('В GitHub есть более новая версия этой главы. Локальный текст не отправлен, чтобы не перезаписать чужие изменения.')
+          return
+        }
+        if (remote.sha !== activeChapter.sha && !local?.dirty) {
+          setChapters((items) => items.map((item) => item.path === remote.path ? remote : item))
+          setContent(remote.content)
+          storage.setDraft(project.fullName, remote.path, { content: remote.content, baseSha: remote.sha, dirty: false, updatedAt: Date.now() })
+          setSync('synced')
+          return
+        }
+        current = remote
+      }
+
+      const local = storage.getDraft(project.fullName, activeChapter.path)
+      if (!local?.dirty && content === current.content) {
+        setSync('synced')
+        return
+      }
+
+      const sha = await saveChapter(octokit, project, current, content)
+      const saved = { ...current, sha, content }
+      setChapters((items) => items.map((item) => item.path === saved.path ? saved : item))
+      storage.setDraft(project.fullName, saved.path, { content, baseSha: sha, dirty: false, updatedAt: Date.now() })
+
+      if (checkRemote) {
+        const verified = await loadChapter(octokit, project, saved.path)
+        setChapters((items) => items.map((item) => item.path === verified.path ? verified : item))
+        storage.setDraft(project.fullName, verified.path, { content: verified.content, baseSha: verified.sha, dirty: false, updatedAt: Date.now() })
+        setContent(verified.content)
+      }
+      setSync('synced')
+    } catch (e) {
+      setSync('error')
+      setError(e instanceof Error ? e.message : 'Не удалось синхронизировать главу')
+    }
+  }
+
   useEffect(() => {
     if (!octokit || !project || !activeChapter || sync !== 'local') return
-    const timer = window.setTimeout(async () => {
-      setSync('syncing')
-      try {
-        const sha = await saveChapter(octokit, project, activeChapter, content)
-        setChapters((items) => items.map((item) => item.path === activeChapter.path ? { ...item, sha, content } : item))
-        storage.setDraft(project.fullName, activeChapter.path, { content, baseSha: sha, dirty: false, updatedAt: Date.now() })
-        setSync('synced')
-      } catch { setSync('error') }
-    }, 1600)
+    const timer = window.setTimeout(() => { void syncCurrentChapter(false) }, 60_000)
     return () => window.clearTimeout(timer)
-  }, [content, sync, octokit, project, activeChapter])
+  }, [content, sync, octokit, project, activePath])
 
   const addChapter = async () => {
     if (!octokit || !project) return
@@ -190,5 +229,5 @@ export default function App() {
 
   if (!project) return <main className="projects-page"><header className="projects-header"><div><h1>happy-writer</h1><span>Книги</span></div><div className="header-actions"><button className="icon-button" onClick={toggleTheme} title={themeTitle}>{themeIcon}</button><button className="icon-button" onClick={logout} title="Выйти"><LogOut size={18} /></button></div></header><section className="project-actions"><div className="repo-input"><Search size={18} /><input value={manualRepo} onChange={(e) => setManualRepo(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && void openManualProject()} placeholder="owner/repository" /><button onClick={() => void openManualProject()}>Открыть</button></div><button className="secondary" onClick={() => void refreshProjects()} disabled={busy}><RefreshCw size={17} className={busy ? 'spin' : ''} /> Найти book-framework репозитории</button></section>{error && <div className="error-box">{error}</div>}<div className="project-grid">{projects.map((item) => <button className="project-card" key={item.fullName} onClick={() => void openProject(item)}><BookOpen /><strong>{item.title}</strong><span>{item.fullName}</span></button>)}{!projects.length && !busy && <div className="empty">Проекты не найдены. Можно открыть репозиторий вручную или запустить поиск.</div>}</div></main>
 
-  return <div className="writer" onTouchStart={handleTouchStart} onTouchEnd={handleTouchEnd}>{drawer && <button className="drawer-scrim" onClick={() => setDrawer(false)} aria-label="Закрыть меню" />}<aside className={`sidebar ${drawer ? 'open' : ''}`}><div className="sidebar-head"><div className="sidebar-actions"><button className="back-button" onClick={() => { setProject(null); setDrawer(false) }}><ChevronLeft size={18} /> К книгам</button><button className="sidebar-theme" onClick={toggleTheme} title={themeTitle}>{themeIcon}</button></div><h2>{project.title}</h2><span>{project.fullName}</span></div><div className="chapter-list">{chapters.map((chapter) => <div className={`chapter-row ${chapter.path === activePath ? 'active' : ''}`} key={chapter.path}><button className="chapter-select" onClick={() => selectChapter(chapter)}><span>{chapter.title || chapter.name}</span><small>{chapter.name}</small></button><div className="chapter-actions"><button onClick={() => void rename(chapter)} title="Переименовать"><Pencil size={15} /></button><button onClick={() => void remove(chapter)} title="Удалить"><Trash2 size={15} /></button></div></div>)}</div><button className="add-chapter" onClick={() => void addChapter()}><Plus size={18} /> Новая глава</button></aside><section className="workspace"><header className="mobile-header"><button className="icon-button" onClick={() => setDrawer(true)}><Menu /></button><div><strong>{activeChapter?.title || project.title}</strong><span>{project.title}</span></div><button className="icon-button mobile-add" onClick={() => void addChapter()} title="Новая глава"><Plus size={18} /></button><button className="icon-button mobile-theme" onClick={toggleTheme} title={themeTitle}>{themeIcon}</button></header>{error && <div className="error-box editor-error">{error}</div>}{activeChapter ? <BookEditor value={content} onChange={edit} /> : <div className="empty editor-empty">В книге пока нет глав. Создай первую через меню.</div>}<div className={`sync-state ${sync}`}>{sync === 'local' && 'Сохранено локально · отправка…'}{sync === 'syncing' && 'Отправляю в GitHub…'}{sync === 'synced' && 'GitHub синхронизирован'}{sync === 'error' && 'Не удалось синхронизировать · локальная копия сохранена'}</div></section></div>
+  return <div className="writer" onTouchStart={handleTouchStart} onTouchEnd={handleTouchEnd}>{drawer && <button className="drawer-scrim" onClick={() => setDrawer(false)} aria-label="Закрыть меню" />}<aside className={`sidebar ${drawer ? 'open' : ''}`}><div className="sidebar-head"><div className="sidebar-actions"><button className="back-button" onClick={() => { setProject(null); setDrawer(false) }}><ChevronLeft size={18} /> К книгам</button><button className="sidebar-theme" onClick={toggleTheme} title={themeTitle}>{themeIcon}</button></div><h2>{project.title}</h2><span>{project.fullName}</span></div><div className="chapter-list">{chapters.map((chapter) => <div className={`chapter-row ${chapter.path === activePath ? 'active' : ''}`} key={chapter.path}><button className="chapter-select" onClick={() => selectChapter(chapter)}><span>{chapter.title || chapter.name}</span><small>{chapter.name}</small></button><div className="chapter-actions"><button onClick={() => void rename(chapter)} title="Переименовать"><Pencil size={15} /></button><button onClick={() => void remove(chapter)} title="Удалить"><Trash2 size={15} /></button></div></div>)}</div><button className="add-chapter" onClick={() => void addChapter()}><Plus size={18} /> Новая глава</button></aside><section className="workspace"><header className="mobile-header"><button className="icon-button" onClick={() => setDrawer(true)}><Menu /></button><div><strong>{activeChapter?.title || project.title}</strong><span>{project.title}</span></div><button className="icon-button mobile-add" onClick={() => void addChapter()} title="Новая глава"><Plus size={18} /></button><button className="icon-button mobile-theme" onClick={toggleTheme} title={themeTitle}>{themeIcon}</button></header>{error && <div className="error-box editor-error">{error}</div>}{activeChapter ? <BookEditor value={content} onChange={edit} unsynced={sync === 'local' || sync === 'syncing'} syncing={sync === 'syncing'} onSync={() => void syncCurrentChapter(true)} /> : <div className="empty editor-empty">В книге пока нет глав. Создай первую через меню.</div>}<div className={`sync-state ${sync}`}>{sync === 'local' && 'Сохранено локально · автоотправка через минуту'}{sync === 'syncing' && 'Отправляю в GitHub…'}{sync === 'synced' && 'GitHub синхронизирован'}{sync === 'error' && 'Не удалось синхронизировать · локальная копия сохранена'}</div></section></div>
 }
