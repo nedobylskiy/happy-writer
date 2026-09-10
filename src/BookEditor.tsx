@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { Bold, ChevronDown, Code, Footprints, Heading2, Italic, Minus, Redo2, Undo2 } from 'lucide-react'
+import { Bold, ChevronDown, CloudUpload, Code, Footprints, Heading2, Italic, Minus, Redo2, Undo2 } from 'lucide-react'
 
 function escapeHtml(text: string) {
   return text.replace(/[&<>]/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[char]!))
@@ -116,7 +116,15 @@ function htmlToSource(root: HTMLElement) {
   return `${blocks.join('\n\n').trim()}\n`
 }
 
-export function BookEditor({ value, onChange }: { value: string; onChange: (value: string) => void }) {
+type Props = {
+  value: string
+  onChange: (value: string) => void
+  onSync: () => void
+  unsynced: boolean
+  syncing: boolean
+}
+
+export function BookEditor({ value, onChange, onSync, unsynced, syncing }: Props) {
   const ref = useRef<HTMLDivElement>(null)
   const lastValue = useRef('')
   const [headingMenu, setHeadingMenu] = useState(false)
@@ -162,7 +170,6 @@ export function BookEditor({ value, onChange }: { value: string; onChange: (valu
   }
 
   const setHeading = (visualLevel: 1 | 2 | 3) => {
-    // book-framework starts internal headings at ##, so UI H1/H2/H3 maps to ##/###/####.
     command('formatBlock', `h${visualLevel + 1}`)
     setHeadingMenu(false)
   }
@@ -184,7 +191,6 @@ export function BookEditor({ value, onChange }: { value: string; onChange: (valu
     if (!id) return
     const text = window.prompt('Текст сноски', '')
     if (text === null) return
-
     document.execCommand('insertText', false, `[^${id}]`)
     const duplicate = ref.current.querySelector(`[data-footnote-def="${CSS.escape(id)}"]`)
     if (!duplicate) {
@@ -194,26 +200,23 @@ export function BookEditor({ value, onChange }: { value: string; onChange: (valu
   }
 
   return (
-    <div className="editor-shell">
+    <div className={`editor-shell ${unsynced ? 'unsynced' : ''}`}>
       <div className="toolbar" aria-label="Форматирование">
         <button onMouseDown={(e) => e.preventDefault()} onClick={() => command('bold')} title="Жирный"><Bold size={18} /></button>
         <button onMouseDown={(e) => e.preventDefault()} onClick={() => command('italic')} title="Курсив"><Italic size={18} /></button>
         <div className="heading-picker">
-          <button className="heading-trigger" onMouseDown={(e) => e.preventDefault()} onClick={() => setHeadingMenu((open) => !open)} title="Заголовок" aria-expanded={headingMenu}>
-            <Heading2 size={18} /><ChevronDown size={12} />
-          </button>
-          {headingMenu && (
-            <div className="heading-menu" role="menu">
-              <button onMouseDown={(e) => e.preventDefault()} onClick={() => setHeading(1)} role="menuitem"><strong>H1</strong><span>##</span></button>
-              <button onMouseDown={(e) => e.preventDefault()} onClick={() => setHeading(2)} role="menuitem"><strong>H2</strong><span>###</span></button>
-              <button onMouseDown={(e) => e.preventDefault()} onClick={() => setHeading(3)} role="menuitem"><strong>H3</strong><span>####</span></button>
-            </div>
-          )}
+          <button className="heading-trigger" onMouseDown={(e) => e.preventDefault()} onClick={() => setHeadingMenu((open) => !open)} title="Заголовок" aria-expanded={headingMenu}><Heading2 size={18} /><ChevronDown size={12} /></button>
+          {headingMenu && <div className="heading-menu" role="menu">
+            <button onMouseDown={(e) => e.preventDefault()} onClick={() => setHeading(1)} role="menuitem"><strong>H1</strong><span>##</span></button>
+            <button onMouseDown={(e) => e.preventDefault()} onClick={() => setHeading(2)} role="menuitem"><strong>H2</strong><span>###</span></button>
+            <button onMouseDown={(e) => e.preventDefault()} onClick={() => setHeading(3)} role="menuitem"><strong>H3</strong><span>####</span></button>
+          </div>}
         </div>
         <button onMouseDown={(e) => e.preventDefault()} onClick={() => command('formatBlock', 'pre')} title="Блок кода"><Code size={18} /></button>
         <button onMouseDown={(e) => e.preventDefault()} onClick={insertSceneBreak} title="Разрыв сцены"><Minus size={18} /></button>
         <button onMouseDown={(e) => e.preventDefault()} onClick={insertFootnote} title="Сноска"><Footprints size={18} /></button>
         <span className="toolbar-spacer" />
+        <button className="sync-button" onMouseDown={(e) => e.preventDefault()} onClick={onSync} disabled={syncing} title="Отправить изменения и проверить GitHub" aria-label="Отправить изменения и проверить GitHub"><CloudUpload size={19} /></button>
         <button onMouseDown={(e) => e.preventDefault()} onClick={() => command('undo')} title="Отменить"><Undo2 size={18} /></button>
         <button onMouseDown={(e) => e.preventDefault()} onClick={() => command('redo')} title="Повторить"><Redo2 size={18} /></button>
       </div>
