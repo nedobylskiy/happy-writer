@@ -198,4 +198,39 @@
   .toolbar > .toolbar-spacer,
   .toolbar > .toolbar-sync-status { flex-shrink: 0; }
   .desktop-file-heading { display: none; }
+
+  .mobile-header { position: relative; }
+  .mobile-header:has(.version-switch) .mobile-add { display: none; }
+  .mobile-header .file-heading {
+    display: block;
+    min-width: 0;
+    padding-right: 0;
+  }
+  .mobile-header .file-heading > strong,
+  .mobile-header .file-heading > span {
+    display: block;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .mobile-header .file-heading .version-switch {
+    position: absolute;
+    right: 62px;
+    top: 9px;
+    width: 42px;
+    height: 42px;
+    padding: 0;
+    border-radius: 11px;
+    display: grid;
+    place-items: center;
+    font-size: 0;
+    background: #eee7dc;
+    color: #4c443b;
+  }
+  .mobile-header .file-heading .version-switch svg { width: 18px; height: 18px; }
+  :root[data-theme='dark'] .mobile-header .file-heading .version-switch {
+    background: #2d2924;
+    color: #ddd5ca;
+  }
 }
