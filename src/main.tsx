@@ -1,9 +1,11 @@
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import App from './App'
+import { initEditorFontSizeControl } from './font-size-control'
 import './styles.css'
 import './font-overrides.css'
 import './enhancements.css'
+import './font-size-control.css'
 
 function updateVisualViewportVars() {
   const viewport = window.visualViewport
@@ -41,3 +43,5 @@ createRoot(document.getElementById('root')!).render(
     <App />
   </StrictMode>,
 )
+
+initEditorFontSizeControl()
