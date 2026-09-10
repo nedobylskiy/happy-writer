@@ -97,15 +97,51 @@
   border-radius: 50%;
   background: #6fa36d;
 }
-.autosync-countdown {
+
+.toolbar-sync-status {
   flex: 0 0 auto;
-  min-width: 38px;
-  text-align: center;
-  font: 600 12px/1 ui-monospace, SFMono-Regular, Consolas, monospace;
-  color: #7c746a;
-  opacity: .9;
+  min-width: 30px;
+  height: 32px;
+  padding: 0 7px;
+  border-radius: 9px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  font: 650 11px/1 ui-monospace, SFMono-Regular, Consolas, monospace;
+  color: #777067;
 }
-:root[data-theme='dark'] .autosync-countdown { color: #aaa095; }
+.toolbar-sync-status.ok { color: #5d8b5a; }
+.toolbar-sync-status.pending { color: #6f8d68; background: rgba(111,163,109,.08); }
+.toolbar-sync-status.syncing { color: #8b8176; }
+.toolbar-sync-status.error { color: #a34b42; }
+:root[data-theme='dark'] .toolbar-sync-status { color: #aaa095; }
+:root[data-theme='dark'] .toolbar-sync-status.ok { color: #8fbd88; }
+:root[data-theme='dark'] .toolbar-sync-status.pending { color: #9cc293; background: rgba(111,163,109,.1); }
+:root[data-theme='dark'] .toolbar-sync-status.error { color: #dc8c82; }
+
+.autosync-toggle {
+  flex: 0 0 auto;
+  margin: 0 10px 8px;
+  min-height: 44px;
+  padding: 9px 12px;
+  border: 0;
+  border-radius: 11px;
+  background: #37322d;
+  color: #d9d1c6;
+  display: grid;
+  grid-template-columns: 24px 1fr auto;
+  align-items: center;
+  column-gap: 8px;
+  text-align: left;
+}
+.autosync-toggle svg { grid-row: 1 / span 2; }
+.autosync-toggle span { font-size: 13px; font-weight: 650; }
+.autosync-toggle small { font-size: 11px; opacity: .62; }
+.autosync-toggle.on svg { color: #9bc495; }
+.autosync-toggle.off { opacity: .74; }
+.autosync-toggle.off svg { color: #9d9489; }
+.autosync-toggle:hover { background: #413b35; }
 
 @media (max-width: 760px) {
   .chapter-actions { opacity: 1; }
@@ -126,8 +162,5 @@
   .toolbar > button,
   .toolbar > .heading-picker,
   .toolbar > .toolbar-spacer,
-  .toolbar > .autosync-countdown { flex-shrink: 0; }
-  .sync-state {
-    bottom: calc(var(--keyboard-offset, 0px) + 70px) !important;
-  }
+  .toolbar > .toolbar-sync-status { flex-shrink: 0; }
 }
